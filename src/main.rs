@@ -370,11 +370,21 @@ fn pull(
         run_rsync(host, local_path, remote_path, is_file, args, true)
     }
 }
+fn ssh_options() -> Vec<String> {
+    vec![
+        "-o".to_string(),
+        "ConnectTimeout=10".to_string(),
+        "-o".to_string(),
+        "ServerAliveInterval=15".to_string(),
+        "-o".to_string(),
+        "ServerAliveCountMax=2".to_string(),
+    ]
+}
+
 fn remote_is_file(runner: &dyn CommandRunner, host: &str, remote_path: &str) -> Result<bool> {
-    let args = vec![
-        host.to_string(),
-        format!("test -f {}", remote_shell_path(remote_path)),
-    ];
+    let mut args = ssh_options();
+    args.push(host.to_string());
+    args.push(format!("test -f {}", remote_shell_path(remote_path)));
     let status = runner
         .status("ssh", &args)
         .with_context(|| "failed to run ssh test -f")?;
@@ -395,10 +405,9 @@ fn ensure_remote_parent(
     host: &str,
     remote_parent: &str,
 ) -> Result<()> {
-    let args = vec![
-        host.to_string(),
-        format!("mkdir -p {}", remote_shell_path(remote_parent)),
-    ];
+    let mut args = ssh_options();
+    args.push(host.to_string());
+    args.push(format!("mkdir -p {}", remote_shell_path(remote_parent)));
     let status = runner
         .status("ssh", &args)
         .with_context(|| "failed to run ssh mkdir -p")?;
@@ -627,6 +636,8 @@ fn base_rsync_args(args: &Args, dry_run: bool) -> Vec<String> {
         list.push("--info=progress2".to_string());
         list.push("--out-format=%i|%n".to_string());
     }
+    list.push("-e".to_string());
+    list.push(format!("ssh {}", ssh_options().join(" ")));
     list.push("--stats".to_string());
 
     if !args.all {
@@ -963,10 +974,9 @@ mod tests {
     fn remote_is_file_uses_ssh() {
         let host = "example";
         let remote = "~/projects/app/file.txt";
-        let args = vec![
-            host.to_string(),
-            format!("test -f {}", remote_shell_path(remote)),
-        ];
+        let mut args = ssh_options();
+        args.push(host.to_string());
+        args.push(format!("test -f {}", remote_shell_path(remote)));
 
         let runner = FakeRunner::new(vec![ExpectedCall {
             program: "ssh".to_string(),
@@ -983,10 +993,9 @@ mod tests {
     fn ensure_remote_parent_creates_dir() {
         let host = "example";
         let remote_parent = "~/projects/app";
-        let args = vec![
-            host.to_string(),
-            format!("mkdir -p {}", remote_shell_path(remote_parent)),
-        ];
+        let mut args = ssh_options();
+        args.push(host.to_string());
+        args.push(format!("mkdir -p {}", remote_shell_path(remote_parent)));
 
         let runner = FakeRunner::new(vec![ExpectedCall {
             program: "ssh".to_string(),

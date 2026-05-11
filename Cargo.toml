@@ -1,6 +1,6 @@
 [package]
 name = "syncz"
-version = "0.1.9"
+version = "0.1.10"
 edition = "2021"
 description = "Zero-config file sync between local and remote machines using rsync + ssh"
 license = "MIT"
